@@ -67,8 +67,10 @@ contain REGEXP at the beginning."
                          (cons (match-string 1 header) (match-string 2 header)))
                     (and (string-match        ; move (without modification)
                           "^diff --git a/\\(.*\\) b/\\(.*\\)$" header)
-                         (cons (match-string 1 header) (match-string 2 header))))))
-      (:file file :diff (git-review--parse-patch-hunks hunks)))))
+                         (cons (match-string 1 header) (match-string 2 header)))))
+          (hunks (git-review--parse-patch-hunks hunks)))
+      (unless (string= (car file) (cdr file)) (push (list 'move (cdr file)) hunks))
+      (list :file (car file) :diff hunks))))
 
 (defun git-review--parse-patch-hunks (hunks)
   "Internal function for `git-review--parse-file-patch'."
@@ -91,7 +93,22 @@ contain REGEXP at the beginning."
                (cl-incf lineno)))))))
     (nreverse res)))
 
-;; (git-review--get-patches "HEAD")
+;; (git-review--get-patches "d22872")
+;; (:header "commit d22872a372cab28f81376fed8b4878c1a5c0b0db
+;; Author: p <_>
+;; Date:   Sat Oct 28 00:35:43 2017 +0900
+;;
+;;     hoge
+;;
+;; " :files
+;; ((:file "/dev/null" :diff
+;;         ((move "hoge")
+;;          (insert 0 "hoge")
+;;          (insert 1 "hoge")
+;;          (insert 2 "hoge")
+;;          (insert 3 "")))))
+
+;; (git-review--get-patches "90e8ba")
 ;; (:header "commit 90e8bafac82af2ba8ef98ab167b9f922f6f6beff
 ;; Author: p <_>
 ;; Date:   Wed Nov 1 09:14:25 2017 +0900
@@ -99,17 +116,15 @@ contain REGEXP at the beginning."
 ;;     hoge
 ;;
 ;; " :files
-;; ((:file
-;;   ("hoge" . "hoge")
-;;   :diff
-;;   ((delete 18)
-;;    (insert 18 " 18: hage")
-;;    (delete 30)
-;;    (delete 37)
-;;    (insert 37 " 38: piyo")
-;;    (delete 39)
-;;    (insert 39 " 40: huge")
-;;    (insert 40 " 401:aaa")))))
+;; ((:file "hoge" :diff
+;;         ((delete 18)
+;;          (insert 18 " 18: hage")
+;;          (delete 30)
+;;          (delete 37)
+;;          (insert 37 " 38: piyo")
+;;          (delete 39)
+;;          (insert 39 " 40: huge")
+;;          (insert 40 " 401:aaa")))))
 
 ;; * Make "combined diff" from parsed patches
 
@@ -127,18 +142,20 @@ file for combined diff, and returns the buffer."
                              (shell-quote-argument (concat initial-commit "^"))
                              (shell-quote-argument file))))
             (insert (shell-command-to-string cmd))))
-        (save-excursion
-          (replace-regexp "^" (make-string commit-count ?\s)))
-        (setq git-review--original-file-name file)))
+        (replace-regexp "^" (make-string commit-count ?\s))
+        (setq git-review--original-file-name file)
+        (goto-char (point-min))))
     buf))
 
-(defun git-review--apply-hunks (hunks commit-index commit-count)
+(defun git-review--apply-file-patch (file-patch commit-index commit-count)
   "Internal function for `git-review--make-combined-diff'. Apply
 hunks to the current buffer. This function uses overlays to
 record deleted lines, which should be replaced with real strings
 later (by `git-review--finalize-combined-diff')."
+  (when (eq (caar file-patch) 'move)
+    (push (cons (cadr (pop file-patch)) commit-index) git-review--file-name-changes))
   (save-excursion
-    (dolist (hunk hunks)
+    (dolist (hunk file-patch)
       (goto-line (cadr hunk))
       (cl-case (car hunk)
         ((delete)
@@ -161,31 +178,56 @@ later (by `git-review--finalize-combined-diff')."
                  (make-string (- commit-count commit-index 1) ?\s)
                  (cl-caddr hunk) "\n"))))))
 
-(defun git-review--finalize-combined-diff ()
+(defun git-review--finalize-combined-diff (commit-count)
   "Internal function for
 `git-review--make-combined-diff'. Replace all intermediate
 overlays with real strings, and adds the file name changes."
+  (save-excursion
+    (insert "Combied Diff: " git-review--original-file-name "\n"
+            "\n==============================\n")
+    (when (print git-review--file-name-changes)
+      (insert "File Name Changes:\n\n"
+              (make-string commit-count ?\s) git-review--original-file-name "\n")
+      (dolist (change (nreverse git-review--file-name-changes))
+        (save-excursion
+          (forward-line -1)
+          (forward-char (cdr change))
+          (delete-char 1)
+          (insert "-"))
+        (insert (make-string (cdr change) ?\s)
+                "+"
+                (make-string (- commit-count (cdr change) 1) ?\s)
+                (car change) "\n"))
+      (insert "\n==============================\n"))
+    (insert "File Content Changes:\n\n"))
   (mapc (lambda (ov)
           (goto-char (overlay-start ov))
           (insert (overlay-get ov 'before-string))
           (delete-overlay ov))
         (overlays-in (point-min) (point-max))))
 
-;; (let ((buffer (git-review--open-file-for-combined-diff "./hoge" "90e8ba" 2)))
+;; (let ((buffer (git-review--open-file-for-combined-diff "./hoge" "90e8ba" 3)))
 ;;   (with-current-buffer buffer
-;;     (git-review--apply-hunks '((delete 18)
-;;                                (insert 18 " 18: hage")
-;;                                (delete 30)
-;;                                (delete 37)
-;;                                (insert 37 " 38: piyo")
-;;                                (delete 39)
-;;                                (insert 39 " 40: huge")
-;;                                (insert 40 " 401:aaa"))
-;;                              0 2)
-;;     (git-review--apply-hunks '((delete 18)
-;;                                (insert 18 " 18: brabrabra"))
-;;                              1 2)
-;;     (git-review--finalize-combined-diff))
+;;     (git-review--apply-file-patch '((delete 18)
+;;                                     (insert 18 " 18: hage")
+;;                                     (delete 30)
+;;                                     (delete 37)
+;;                                     (insert 37 " 38: piyo")
+;;                                     (delete 39)
+;;                                     (insert 39 " 40: huge")
+;;                                     (insert 40 " 401:aaa"))
+;;                                   0 3)
+;;     (git-review--apply-file-patch '((move "./fuga")
+;;                                     (delete 18)
+;;                                     (insert 18 " 18: brabrabra"))
+;;                                   1 3)
+;;     (git-review--apply-file-patch '((move "./piyo")
+;;                                     (delete 18)
+;;                                     (insert 18 " 18: piyopiyopiyo")
+;;                                     (delete 52)
+;;                                     (insert 52 " 52: piyopiyopiyo"))
+;;                                   2 3)
+;;     (git-review--finalize-combined-diff 3))
 ;;   (display-buffer buffer))
 
 (provide 'tinyreviewer)
