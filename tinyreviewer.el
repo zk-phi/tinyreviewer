@@ -199,12 +199,12 @@ overlays with real strings, and adds the file name changes."
                 (make-string (- commit-count (cdr change) 1) ?\s)
                 (car change) "\n"))
       (insert "\n==============================\n"))
-    (insert "File Content Changes:\n\n"))
-  (mapc (lambda (ov)
-          (goto-char (overlay-start ov))
-          (insert (overlay-get ov 'before-string))
-          (delete-overlay ov))
-        (overlays-in (point-min) (point-max))))
+    (insert "File Content Changes:\n\n")
+    (mapc (lambda (ov)
+            (goto-char (overlay-start ov))
+            (insert (overlay-get ov 'before-string))
+            (delete-overlay ov))
+          (overlays-in (point-min) (point-max)))))
 
 ;; (let ((buffer (git-review--open-file-for-combined-diff "./hoge" "90e8ba" 3)))
 ;;   (with-current-buffer buffer
