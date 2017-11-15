@@ -33,7 +33,7 @@
   "A simple tool to review a git branch."
   :group 'emacs)
 
-;; * Utility
+;; * ----- Utility
 
 (defun git-review--split-string (string regexp)
   "Split string with regexp. Strings in the resulting list may
@@ -49,7 +49,7 @@ contain REGEXP at the beginning."
         (push (buffer-substring beg (point-max)) res))
       (nreverse res))))
 
-;; * Parse `git show` output
+;; * ----- Parse `git show` output
 
 (defun git-review--get-patches (revision)
   "Get `git show REVISION` parsed."
@@ -126,7 +126,7 @@ contain REGEXP at the beginning."
 ;;          (insert 39 " 40: huge")
 ;;          (insert 40 " 401:aaa")))))
 
-;; * Make "combined diff" from parsed patches
+;; * ----- Make "combined diff" from parsed patches
 
 (defvar-local git-review--original-file-name nil)
 (defvar-local git-review--file-name-changes nil)
