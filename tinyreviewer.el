@@ -53,8 +53,7 @@ contain REGEXP at the beginning."
 
 ;; Commit:     (HEADER . (FILE-PATCH ...))
 ;; File patch: ((FROM-FILENAME . TO-FILENAME) . (HUNK ...))
-;; Hunk:       (COMMAND ...)
-;;               where COMMAND is either (delete LINENO) or (insert LINENO STRING)
+;; Hunk:       List of commands -- either (delete LINENO) or (insert LINENO STRING)
 
 (defun git-review--get-commit (revision)
   "Get `git show REVISION` parsed."
@@ -255,17 +254,16 @@ overlays with real strings, and adds the file name changes."
 
 ;; * ----- Make combined diff of all files from commits
 
-(defun git-review--make-combined-diffs (commits first-revision)
-  "Make combined diff buffers for files deleted, created or
-modified in COMMITS, and return as a list of the form ((FILENAME
-. BUFFER) ...)."
-  (let ((commit-count (length commits))
+(defun git-review--make-combined-diffs (commit-file-patches first-revision)
+  "Make and return combined diff buffers for files deleted,
+created or modified in COMMITS."
+  (let ((commit-count (length commit-file-patches))
         (headers nil)
         (deleted-files nil)                             ; List[Buffer]
         (modified-files (make-hash-table :test 'equal)) ; Map[Filename][Buffer]
         (commit-index 0))
-    (dolist (commit-patch commits)
-      (dolist (file-patch commit-patch)
+    (dolist (flie-patches commit-file-patches)
+      (dolist (file-patch flie-patches)
         (cl-destructuring-bind ((from-file . to-file) . hunks) file-patch
           (let ((buf (gethash from-file modified-files)))
             (unless buf
@@ -289,7 +287,7 @@ modified in COMMITS, and return as a list of the form ((FILENAME
     ;; return value
     (let ((res deleted-files))
       (maphash (lambda (_ v) (push v res)) modified-files)
-      (mapcar (lambda (v) (with-current-buffer v (cons git-review--display-file-name v))) res))))
+      res)))
 
 ;; (git-review--make-combined-diffs
 ;;  (list (cdr (git-review--get-commit "b3a980319f9cbb6c284a2475c68231a641ff3a15"))
