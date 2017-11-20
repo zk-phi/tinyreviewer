@@ -83,7 +83,8 @@ contain REGEXP at the beginning."
     (cons (car splitted) (mapcar 'tinyreviewer--parse-file-patch (cdr splitted)))))
 
 (defun tinyreviewer--parse-file-patch (file-patch)
-  "Internal function for `tinyreviewer--get-commit'."
+  "Internal function for `tinyreviewer--get-commit'. Parse a
+single-file diff."
   (cl-destructuring-bind (header . hunks)
       (tinyreviewer--split-string file-patch "^@@[0-9-+, ]*@@")
     (let ((file (or (and (string-match ; create, delete, modify, move (with modification)
@@ -95,7 +96,8 @@ contain REGEXP at the beginning."
       (cons file (tinyreviewer--parse-patch-hunks hunks)))))
 
 (defun tinyreviewer--parse-patch-hunks (hunks)
-  "Internal function for `tinyreviewer--parse-file-patch'."
+  "Internal function for `tinyreviewer--parse-file-patch'. Parse
+all hunks in a single-file diff."
   (let ((offset 0) res)
     (dolist (hunk hunks)
       (cl-destructuring-bind (header . lines) (split-string hunk "\n" t)
@@ -149,6 +151,9 @@ contain REGEXP at the beginning."
 
 ;; * ----- Make "combined diff" from commits
 
+;; Everything in this section is internal function / variable of
+;; `tinyreviewer--make-combined-diffs'
+
 (defvar-local tinyreviewer--original-file-name nil
   "Initial file name for the buffer")
 (defvar-local tinyreviewer--file-name-changes nil
@@ -157,8 +162,7 @@ contain REGEXP at the beginning."
   "User-friendly file name for the buffer.")
 
 (defun tinyreviewer--open-file-for-combined-diff (file first-revision commit-count)
-  "Internal function for `tinyreviewer--make-combined-diffs'. Open
-file for combined diff, and returns the buffer."
+  "Open file for combined diff, and returns the buffer."
   (let ((buf (generate-new-buffer (concat "*review " (file-name-nondirectory file) "*"))))
     (with-current-buffer buf
       (unless (string= file "/dev/null")
@@ -174,19 +178,17 @@ file for combined diff, and returns the buffer."
     buf))
 
 (defun tinyreviewer--apply-filename-change (to-filename commit-index)
-  "Internal function for `tinyreviewer--make-combined-diffs'. Record
-filename changes to the current buffer's local variables, which
-can be formatted later (by
+  "Record filename change to the current buffer's local internal
+variables, which can be formatted later (by
 `tinyreviewer--finalize-combined-diff')."
   (push (cons to-filename commit-index) tinyreviewer--file-name-changes)
   (when (string= tinyreviewer--display-file-name "/dev/null")
     (setq tinyreviewer--display-file-name to-filename)))
 
 (defun tinyreviewer--apply-hunk (hunk commit-index commit-count)
-  "Internal function for `tinyreviewer--make-combined-diffs'. Apply
-a hunk to the current buffer. This function uses overlays to
-record deleted lines, which should be replaced with real strings
-later (by `tinyreviewer--finalize-combined-diff')."
+  "Apply a hunk to the current buffer. This function uses
+overlays to record deleted lines, which should be replaced with
+real strings later (by `tinyreviewer--finalize-combined-diff')."
   (save-excursion
     (dolist (command hunk)
       (goto-line (cadr command))
@@ -213,9 +215,8 @@ later (by `tinyreviewer--finalize-combined-diff')."
                  (cl-caddr command) "\n"))))))
 
 (defun tinyreviewer--finalize-combined-diff (commit-count)
-  "Internal function for
-`tinyreviewer--make-combined-diffs'. Replace all intermediate
-overlays with real strings, and adds the file name changes."
+  "Replace all intermediate overlays with real strings, and adds
+the file name changes."
   (save-excursion
     (mapc (lambda (ov)
             (goto-char (overlay-start ov))
