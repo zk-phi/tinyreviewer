@@ -318,13 +318,11 @@ created or modified in COMMITS."
 
 ;; * ----- Utility functions for combined-diff buffers
 
-(defvar-local tinyreviewer--folding-overlays nil)
-
 (defun tinyreviewer--highlight (b e)
   "Highlight modified lines in region."
   (save-excursion
     (goto-char b)
-    (while (search-forward-regexp "^ *\\([+-]\\(?:[+- ]*[+-]\\)?\\) *|" nil t)
+    (while (search-forward-regexp "^ *\\(\\+\\(?: *-\\)?\\|-\\) *|" nil t)
       (put-text-property
        (point-at-bol) (point-at-eol) 'face
        (or (assoc-default (match-string 1) '(("-" . tinyreviewer-deleted)
@@ -338,8 +336,10 @@ created or modified in COMMITS."
 ;;                        (cdr (tinyreviewer--get-commit "HEAD")))
 ;;                  "HEAD^^^"))))
 ;;   (with-current-buffer buf
-;;     (tinyreviewer--highlight (point-min) (point-max))))
+;;     (tinyreviewer--highlight (point-min) (point-max)))
+;;   (display-buffer buf))
 
+;; (defvar-local tinyreviewer--folding-overlays nil)
 ;; (defun tinyreviewer--fold-combined-diffs ()
 ;;   "Hide unchanged region of current combined-diff buffer."
 ;;   (save-excursion
@@ -350,7 +350,7 @@ created or modified in COMMITS."
 ;;       (while (zerop (forward-char 1))
 ;;         (if ())))))
 
-(defun tinyreviewer--filter-combined-diffs ())
+;; (defun tinyreviewer--filter-combined-diffs ())
 
 (provide 'tinyreviewer)
 
